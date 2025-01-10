@@ -1,2 +1,3 @@
-# www
-Auxiliary resources of the www subdomain, outside the WordPress ecosystem
+# www - Auxiliary Resources outside WordPress ecosystem
+
+This repository is dedicated to manage all static files, resources, redirections, and configuration deployments associated with the www subdomain, but outside the WordPress ecosystem.
