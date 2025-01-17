@@ -1,0 +1,19 @@
+- name: Persistent Volume Claim
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "{{ app_name }}"
+        namespace: "{{ openshift_namespace }}"
+        labels:
+          app: "{{ app_name }}"
+      spec:
+        accessModes:
+          - ReadWriteMany
+        storageClassName: ""
+        volumeMode: Filesystem
+        resources:
+          requests:
+            storage: "{{ pv_storage }}"
+        volumeName: "{{ pv_name }}"
