@@ -1,0 +1,16 @@
+all:
+  hosts:
+    openshift_namespace_prod:
+      ansible_connection: local
+      ansible_host: localhost
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      openshift_namespace: svc0041p-wordpress
+  vars:
+    # Routing
+    www_host: www.epfl.ch
+    avi_route_access_level: public
+    # Storage
+    pv_name: pv-svc0041-www-auxiliary-prod-app
+    pv_storage: 1Gi
+    # NGINX
+    nginx_real_ip_header: CF-Connecting-IP

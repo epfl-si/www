@@ -1,0 +1,132 @@
+- name: Pull Secret
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: kubernetes.io/dockerconfigjson
+      metadata:
+        name: "{{ app_name }}-pull-secret"
+        namespace: "{{ openshift_namespace }}"
+      data:
+        .dockerconfigjson: "{{ pull_secret_config | to_json | b64encode }}"
+
+- name: Service Account
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: "{{ app_name }}"
+        namespace: "{{ openshift_namespace }}"
+      imagePullSecrets:
+        - name: "{{ app_name }}-pull-secret"
+
+- name: ConfigMap
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ app_name }}-nginx-config"
+        namespace: "{{ openshift_namespace }}"
+        labels:
+          app: "{{ app_name }}"
+      data:
+        nginx.conf: "{{ lookup('template', 'nginx.conf') }}"
+  register: _www_auxiliary_configmap
+
+- name: Deployment
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ app_name }}"
+        namespace: "{{ openshift_namespace }}"
+      spec:
+        replicas: 2
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxUnavailable: 1
+        selector:
+          matchLabels:
+            app: "{{ app_name }}"
+        template:
+          metadata:
+            labels:
+              app: "{{ app_name }}"
+          spec:
+            serviceAccountName: "{{ app_name }}"
+            containers:
+              - image: "{{ nginx_image_source }}"
+                imagePullPolicy: Always
+                name: "{{ app_name }}"
+                ports:
+                  - containerPort: 8080
+                volumeMounts:
+                  - name: public-volume
+                    mountPath: /public
+                  - name: nginx-conf-volume
+                    mountPath: /etc/nginx/conf.d
+                resources:
+                  requests:
+                    cpu: "50m"
+                    memory: "32Mi"
+                  limits:
+                    cpu: "100m"
+                    memory: "128Mi"
+                readinessProbe:
+                  tcpSocket:
+                    port: 8080
+                  initialDelaySeconds: 5
+                  timeoutSeconds: 3
+                livenessProbe:
+                  tcpSocket:
+                    port: 8080
+                  initialDelaySeconds: 5
+                  timeoutSeconds: 3
+            volumes:
+              - name: public-volume
+                persistentVolumeClaim:
+                  claimName: "{{ app_name }}"
+              - name: nginx-conf-volume
+                configMap:
+                  name: "{{ app_name }}-nginx-config"
+
+- name: Service
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ app_name }}"
+        namespace: "{{ openshift_namespace }}"
+      spec:
+        type: ClusterIP
+        ports:
+          - name: "{{ app_name }}-svc-port"
+            port: 8080
+            protocol: TCP
+            targetPort: 8080
+        selector:
+          app: "{{ app_name }}"
+
+- name: Nginx restart
+  when: >-
+    ("nginx.restart" in ansible_run_tags)
+    or
+    ( (_www_auxiliary_configmap | default({})) is changed )
+  kubernetes.core.k8s:
+    state: patched
+    kind: Deployment
+    definition:
+      metadata:
+        name: "{{ app_name }}"
+        namespace: "{{ openshift_namespace }}"
+      spec:
+        template:
+          metadata:
+            annotations:
+              last-restart: "{{ ansible_date_time.iso8601 }}"
+  tags: nginx.restart

@@ -1,0 +1,63 @@
+- name: Get locations paths from the NGINX redirects section
+  shell: |
+    echo "{{ nginx_conf }}" | \
+    awk '/### REDIRECTIONS:START/,/### REDIRECTIONS:END/' | \
+    awk '/location/ {print $2}' | \
+    sed 's#/$##' | \
+    tr '\n' ',' | \
+    sed 's#,$##'
+  register: _location_paths
+  failed_when: "'error' in _location_paths.stderr"
+  changed_when: false
+
+- name: Format _location_paths into an array
+  set_fact:
+    _redirection_paths: "{{ _location_paths.stdout.split(',') }}"
+
+- name: Get files and directories paths from the filesystem (root directory)
+  shell: |
+    oc exec -it $(oc get pods -l app={{ app_name }} -o jsonpath='{.items[0].metadata.name}') -- ls -A1 /public/www-auxiliary | \
+    awk '{print "/" $0}' | \
+    tr '\n' ',' | \
+    sed 's#,$##'
+  register: _files_and_dir_paths_raw
+  failed_when: "'error' in _files_and_dir_paths_raw.stderr"
+  changed_when: false
+
+- name: Format _files_and_dir_paths_raw into an array
+  set_fact:
+    _files_and_dir_paths: "{{ _files_and_dir_paths_raw.stdout.split(',') }}"
+
+- name: Combine (NGINX + Static files) and remove duplicates
+  set_fact:
+    _all_paths: "{{ (_redirection_paths + _files_and_dir_paths) | unique }}"
+
+- name: Routes
+  kubernetes.core.k8s:
+    definition:
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: >-
+          www-auxiliary-{{
+            item | regex_replace('[^A-Za-z0-9-]+', '-')
+                 | regex_replace('^-', '') }}
+        namespace: "{{ openshift_namespace }}"
+        labels:
+          app: "{{ app_name }}"
+          route: "{{ avi_route_access_level }}"
+        annotations:
+          haproxy.router.openshift.io/balance: roundrobin
+          haproxy.router.openshift.io/disable_cookies: "true"
+      spec:
+        host: "{{ www_host }}"
+        path: "{{ item }}"
+        to:
+          kind: Service
+          name: "{{ app_name }}"
+        port:
+          targetPort: "{{ app_name }}-svc-port"
+        tls:
+          termination: edge
+          insecureEdgeTerminationPolicy: Redirect
+  with_items: "{{ _all_paths }}"

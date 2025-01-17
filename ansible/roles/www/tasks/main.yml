@@ -1,0 +1,27 @@
+- name: "Storage tasks"
+  include_tasks:
+    file: storage.yml
+    apply:
+      tags:
+        - storage
+  tags:
+    - storage
+
+- name: "NGINX tasks"
+  include_tasks:
+    file: nginx.yml
+    apply:
+      tags:
+        - nginx
+  tags:
+    - nginx
+    - nginx.restart
+
+- name: "Routes tasks"
+  include_tasks:
+    file: routes.yml
+    apply:
+      tags:
+        - routes
+  tags:
+    - routes

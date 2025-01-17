@@ -1,0 +1,19 @@
+quay_registry: quay-its.epfl.ch/svc0041
+
+app_name: www-auxiliary
+
+nginx_image_name: nginx-unprivileged
+nginx_image_tag: 1.26.2-alpine
+nginx_image_source: "{{ quay_registry }}/{{ nginx_image_name }}:{{ nginx_image_tag }}"
+nginx_conf: "{{ lookup('template', 'nginx.conf') }}"
+
+openshift_secrets: "{{ lookup('file', '/keybase/team/epfl_www/openshift_secrets.yml') | from_yaml }}"
+
+_pull_robot_secrets: "{{ openshift_secrets.quay.pull_robot }}"
+_pull_robot_credential: "{{ _pull_robot_secrets.name }}:{{ _pull_robot_secrets.token }}"
+
+pull_secret_config:
+  auths:
+    "quay-its.epfl.ch":
+      "auth": "{{ _pull_robot_credential | b64encode }}"
+
