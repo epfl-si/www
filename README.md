@@ -22,10 +22,10 @@ oc cp <my_file_or_dir> $(oc get pods -l app=www-auxiliary -o jsonpath='{.items[0
 
 ### Add a new redirection
 
-Create the redirection in the NGINX [config](ansible/templates/nginx.conf)
+Create the redirection in the NGINX [config](templates/nginx.conf)
 
 ### Deploy
 
 ```bash
-./ansible/wwwsible      # (--prod for production environment)
+./wwwsible      # (--prod for production environment)
 ```
