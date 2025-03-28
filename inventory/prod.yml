@@ -8,7 +8,7 @@ all:
   vars:
     # Routing
     www_host: www.epfl.ch
-    avi_route_access_level: public
+    avi_route_access_level: public-cf
     # Storage
     pv_name: pv-svc0041-www-auxiliary-prod-app
     pv_storage: 1Gi
